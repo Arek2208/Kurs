@@ -6,4 +6,4 @@ zwrotka3.txt
 zwrotka4.txt
 zwrotka5.txt
 zwrotka6.txt
-refren2.txt
+refren1.txt
