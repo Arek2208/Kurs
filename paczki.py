@@ -19,7 +19,7 @@ while biezace_elementy < maksymalnie_elementow:
         waga_paczki += waga_elementu
     else:
         print("Przekroczono limit - koncze dzialanie.")
-    break
+        break
 
 lista_paczek.append(waga_paczki)
 liczba_paczek_na_liscie = len(lista_paczek)
