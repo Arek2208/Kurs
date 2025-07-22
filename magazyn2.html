@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Magazyn i Księgowość</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #333;
+      color: white;
+      padding: 10px;
+      text-align: center;
+    }
+    nav {
+      margin-top: 10px;
+    }
+    nav a {
+      color: #fff;
+      margin: 0 10px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    main {
+      padding: 20px;
+    }
+    .box {
+      background: white;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+    }
+    h2 {
+      margin-top: 0;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input {
+      padding: 5px;
+      width: 100%;
+      margin-top: 5px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 12px;
+    }
+    ul {
+      padding-left: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Magazyn i Ksiegowość</h1>
+    <nav>
+      <a onclick="pokazStrone('main')">Strona główna</a>
+      <a onclick="pokazStrone('historia')">Historia</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Główna część -->
+    <div id="mainDiv">
+      <div class="box">
+        <h2>Stan magazynowy: <span id="magazyn">0</span></h2>
+        <h2>Saldo: <span id="saldo">0</span> zł</h2>
+      </div>
+
+      <div class="box">
+        <h3>Zakup</h3>
+        <label>Nazwa:</label>
+        <input type="text" id="kupNazwa">
+        <label>Cena:</label>
+        <input type="number" id="kupCena">
+        <label>Ilość:</label>
+        <input type="number" id="kupIlosc">
+        <button onclick="kup()">Kup</button>
+      </div>
+
+      <div class="box">
+        <h3>Sprzedaż</h3>
+        <label>Nazwa:</label>
+        <input type="text" id="sprzedajNazwa">
+        <label>Cena:</label>
+        <input type="number" id="sprzedajCena">
+        <label>Ilość:</label>
+        <input type="number" id="sprzedajIlosc">
+        <button onclick="sprzedaj()">Sprzedaj</button>
+      </div>
+
+      <div class="box">
+        <h3>Zmiana salda</h3>
+        <label>Komentarz:</label>
+        <input type="text" id="komentarz">
+        <label>Wartość:</label>
+        <input type="number" id="zmiana">
+        <button onclick="zmienSaldo()">Zmień saldo</button>
+      </div>
+    </div>
+
+    <!-- Historia -->
+    <div id="historiaDiv" style="display: none;">
+      <div class="box">
+        <h2>Historia operacji</h2>
+        <ul id="listaHistorii"></ul>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let magazyn = parseInt(localStorage.getItem("magazyn")) || 0;
+    let saldo = parseFloat(localStorage.getItem("saldo")) || 0;
+    let historia = JSON.parse(localStorage.getItem("historia")) || [];
+
+    function pokazStrone(nazwa) {
+      if (nazwa === "main") {
+        document.getElementById("mainDiv").style.display = "block";
+        document.getElementById("historiaDiv").style.display = "none";
+      } else {
+        document.getElementById("mainDiv").style.display = "none";
+        document.getElementById("historiaDiv").style.display = "block";
+        pokazHistorie();
+      }
+    }
+
+    function aktualizujWidok() {
+      document.getElementById("magazyn").textContent = magazyn;
+      document.getElementById("saldo").textContent = saldo.toFixed(2);
+      localStorage.setItem("magazyn", magazyn);
+      localStorage.setItem("saldo", saldo);
+      localStorage.setItem("historia", JSON.stringify(historia));
+    }
+
+    function dodajDoHistorii(tekst) {
+      const data = new Date().toLocaleString();
+      historia.push(data + ": " + tekst);
+    }
+
+    function kup() {
+      let nazwa = document.getElementById("kupNazwa").value;
+      let cena = parseFloat(document.getElementById("kupCena").value);
+      let ilosc = parseInt(document.getElementById("kupIlosc").value);
+      let koszt = cena * ilosc;
+
+      if (saldo >= koszt) {
+        saldo -= koszt;
+        magazyn += ilosc;
+        dodajDoHistorii("Kupiono: " + nazwa + ", ilość: " + ilosc + ", cena: " + cena);
+        aktualizujWidok();
+      } else {
+        alert("Za mało środków na zakup.");
+      }
+    }
+
+    function sprzedaj() {
+      let nazwa = document.getElementById("sprzedajNazwa").value;
+      let cena = parseFloat(document.getElementById("sprzedajCena").value);
+      let ilosc = parseInt(document.getElementById("sprzedajIlosc").value);
+      let przychod = cena * ilosc;
+
+      if (magazyn >= ilosc) {
+        saldo += przychod;
+        magazyn -= ilosc;
+        dodajDoHistorii("Sprzedano: " + nazwa + ", ilość: " + ilosc + ", cena: " + cena);
+        aktualizujWidok();
+      } else {
+        alert("Za mało towaru w magazynie.");
+      }
+    }
+
+    function zmienSaldo() {
+      let komentarz = document.getElementById("komentarz").value;
+      let wartosc = parseFloat(document.getElementById("zmiana").value);
+      saldo += wartosc;
+      dodajDoHistorii("Zmiana salda: " + komentarz + " (" + wartosc + " zł)");
+      aktualizujWidok();
+    }
+
+    function pokazHistorie() {
+      let lista = document.getElementById("listaHistorii");
+      lista.innerHTML = "";
+      historia.forEach((entry, index) => {
+        let li = document.createElement("li");
+        li.textContent = (index + 1) + ". " + entry;
+        lista.appendChild(li);
+      });
+    }
+
+    // inicjalizacja
+    aktualizujWidok();
+  </script>
+
+</body>
+</html>
