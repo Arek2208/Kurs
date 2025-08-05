@@ -1,115 +1,93 @@
-from flask import Flask, render_template, request, redirect, url_for
 import os
-import json
+import requests
+from flask import Flask, redirect, request, session, render_template
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = "tajny_klucz"
 
-# Ścieżki do plików
-KONTO_FILE = "konto.txt"
-MAGAZYN_FILE = "magazyn.txt"
-HISTORIA_FILE = "historia.txt"
+CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
 
-# Inicjalizacja plików
-if not os.path.exists(KONTO_FILE):
-    with open(KONTO_FILE, 'w') as f:
-        f.write('0')
+@app.route("/")
+def home():
+    return render_template("index.html")
 
-if not os.path.exists(MAGAZYN_FILE):
-    with open(MAGAZYN_FILE, 'w') as f:
-        json.dump({}, f)
+@app.route("/login")
+def login():
+    scope = "user-top-read"
+    auth_url = "https://accounts.spotify.com/authorize"
+    params = {
+        "client_id": CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": REDIRECT_URI,
+        "scope": scope
+    }
+    return redirect(f"{auth_url}?client_id={params['client_id']}&response_type={params['response_type']}&redirect_uri={params['redirect_uri']}&scope={params['scope']}")
 
-if not os.path.exists(HISTORIA_FILE):
-    with open(HISTORIA_FILE, 'w') as f:
-        pass
+@app.route("/callback")
+def callback():
+    code = request.args.get("code")
+    token_url = "https://accounts.spotify.com/api/token"
+    payload = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": REDIRECT_URI,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET
+    }
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    response = requests.post(token_url, data=payload, headers=headers)
+    token = response.json()
+    session["access_token"] = token["access_token"]
+    return redirect("/recommend")
 
-# Pomocnicze funkcje
-def get_saldo():
-    with open(KONTO_FILE) as f:
-        return float(f.read())
+@app.route("/recommend")
+def recommend():
+    access_token = session.get('access_token')
+    if not access_token:
+        return redirect('/')
 
-def set_saldo(value):
-    with open(KONTO_FILE, 'w') as f:
-        f.write(str(value))
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
 
-def get_magazyn():
-    with open(MAGAZYN_FILE) as f:
-        return json.load(f)
+    # Pobierz top artystów
+    top_artists_resp = requests.get(
+        'https://api.spotify.com/v1/me/top/artists?limit=10',
+        headers=headers
+    )
+    if top_artists_resp.status_code != 200:
+        return f"Błąd pobierania artystów: {top_artists_resp.status_code}"
 
-def set_magazyn(mag):
-    with open(MAGAZYN_FILE, 'w') as f:
-        json.dump(mag, f)
+    top_artists = top_artists_resp.json()
+    genres = []
+    for artist in top_artists.get('items', []):
+        genres.extend(artist.get('genres', []))
 
-def add_to_history(entry):
-    with open(HISTORIA_FILE, 'a') as f:
-        f.write(entry + '\n')
+    if not genres:
+        genres = ['pop']  # fallback
 
-def get_history():
-    with open(HISTORIA_FILE) as f:
-        return [line.strip() for line in f.readlines()]
+    seed_genres = list(set(genres))[:2]  # maks 2 unikalne gatunki
 
-# Strona główna
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    saldo = get_saldo()
-    magazyn = get_magazyn()
+    # --- DEBUG ---
+    print("GENRES:", genres)
+    print("SEED_GENRES:", seed_genres)
 
-    if request.method == 'POST':
-        if 'kup' in request.form:
-            nazwa = request.form['kup_nazwa']
-            cena = float(request.form['kup_cena'])
-            ilosc = int(request.form['kup_ilosc'])
-            koszt = cena * ilosc
+    # Wyślij zapytanie o rekomendacje
+    response = requests.get(
+        'https://api.spotify.com/v1/recommendations',
+        headers=headers,
+        params={
+            'limit': 10,
+            'seed_genres': ','.join(seed_genres),
+            'min_energy': 0.4,
+            'min_valence': 0.4
+        }
+    )
 
-            if saldo >= koszt:
-                saldo -= koszt
-                magazyn[nazwa] = magazyn.get(nazwa, 0) + ilosc
-                add_to_history(f"Zakup: {nazwa}, {ilosc} szt., cena: {cena}")
-                set_magazyn(magazyn)
-                set_saldo(saldo)
-            else:
-                add_to_history("Błąd zakupu – niewystarczające środki.")
-
-        elif 'sprzedaj' in request.form:
-            nazwa = request.form['sprzedaj_nazwa']
-            ilosc = int(request.form['sprzedaj_ilosc'])
-
-            if magazyn.get(nazwa, 0) >= ilosc:
-                cena_jednostkowa = 10  # domyślna cena
-                przychod = cena_jednostkowa * ilosc
-                saldo += przychod
-                magazyn[nazwa] -= ilosc
-                add_to_history(f"Sprzedaż: {nazwa}, {ilosc} szt., cena: {cena_jednostkowa}")
-                set_magazyn(magazyn)
-                set_saldo(saldo)
-            else:
-                add_to_history("Błąd sprzedaży – brak wystarczającej ilości.")
-
-        elif 'zmien_saldo' in request.form:
-            wartosc = float(request.form['zmiana_salda'])
-            saldo += wartosc
-            add_to_history(f"Zmiana salda: {wartosc} zł")
-            set_saldo(saldo)
-
-        return redirect(url_for('index'))
-
-    return render_template('index.html', saldo=saldo, magazyn=magazyn)
-
-# Historia bez zakresu
-@app.route('/historia/')
-@app.route('/historia/<int:start>/<int:end>/')
-def historia(start=None, end=None):
-    historia = get_history()
-    zakres = None
-    blad = None
-
-    if start is not None and end is not None:
-        if 0 <= start < end <= len(historia):
-            historia = historia[start:end]
-            zakres = (start, end)
-        else:
-            blad = f"Niepoprawny zakres! Historia ma {len(historia)} wpisów."
-
-    return render_template('historia.html', historia=historia, zakres=zakres, blad=blad, dlugosc=len(get_history()))
-
-if __name__ == '__main__':
+if __name__=="__main__":
     app.run(debug=True)
