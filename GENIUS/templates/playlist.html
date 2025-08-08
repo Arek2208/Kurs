@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Moja Playlista</h1>
+<a href="{{ url_for('index') }}" class="btn btn-secondary mb-4">Powrót</a>
+{% if playlist %}
+  <ul class="list-group">
+    {% for s in playlist %}
+      <li class="list-group-item d-flex align-items-center justify-content-between">
+        <div>
+          {% if s.thumb %}
+            <img src="{{ s.thumb }}" width="40" height="40" class="me-2">
+          {% endif %}
+          {{ s.title }} - <a href="{{ s.url }}" target="_blank">tekst</a>
+        </div>
+        <a href="{{ url_for('remove_from_playlist', idx=loop.index0) }}" class="btn btn-sm btn-danger">Usuń</a>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <div class="alert alert-warning">Twoja playlista jest pusta.</div>
+{% endif %}
+{% endblock %}
