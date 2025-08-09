@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">GENIUS APP</h1>
+
+<form method="get" class="mb-4" style="max-width:700px;">
+  <input type="text" name="artist" class="form-control mb-3"
+         placeholder="Wpisz nazwę artysty" value="{{ artist }}">
+  <button class="btn btn-primary">Szukaj</button>
+</form>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if artist_name %}
+  <div style="max-width:900px;text-align:left;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="m-0">{{ artist_name }}</h2>
+      <small class="text-white">Dodajesz do swojej playlisty</small>
+    </div>
+    {% if songs %}
+      <ul class="list-group">
+        {% for s in songs %}
+          <li class="list-group-item d-flex align-items-center justify-content-between">
+            <div>
+              {% if s.thumb %}
+                <img src="{{ s.thumb }}" width="40" height="40" class="me-2">
+              {% endif %}
+              {{ s.title }} - <a href="{{ s.url }}" target="_blank">tekst</a>
+            </div>
+            <div class="text-center">
+              <form method="post" action="{{ url_for('add_to_playlist') }}">
+                <input type="hidden" name="title" value="{{ s.title }}">
+                <input type="hidden" name="url" value="{{ s.url }}">
+                <input type="hidden" name="thumb" value="{{ s.thumb }}">
+                <input type="hidden" name="return_artist" value="{{ artist }}">
+                <button class="btn btn-sm btn-success">Dodaj</button>
+              </form>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}
